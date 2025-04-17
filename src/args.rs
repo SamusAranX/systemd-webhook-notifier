@@ -1,12 +1,13 @@
 use crate::constants::CLAP_VERSION;
 use clap::{Parser, Subcommand};
+use clap_num::maybe_hex;
 
 #[derive(Parser, Debug)]
 pub struct DiscordArgs {
 	#[arg(short, long, env = "DISCORD_THUMBNAIL", help = "The thumbnail to display as part of the embed")]
 	pub thumbnail: Option<String>,
 
-	#[arg(short, long, env = "DISCORD_COLOR", default_value_t = 0x5E5CE6, help = "The color to apply to the embed")]
+	#[arg(short, long, env = "DISCORD_COLOR", value_parser=maybe_hex::<u32>, default_value_t = 0x5E5CE6, help = "The color to apply to the embed")]
 	pub color: u32,
 
 	#[arg(short, long, env = "DISCORD_WEBHOOK", help = "The URL to send the webhook payload to")]
