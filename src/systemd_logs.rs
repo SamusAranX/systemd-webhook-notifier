@@ -15,7 +15,7 @@ pub struct ServiceInfo {
 	pub environment_str: String,
 	pub environment_vals: Vec<(String, String)>,
 	pub user: String,
-	pub status_errno: u64,
+	pub main_status: i64,
 	pub result: String,
 }
 
@@ -31,7 +31,7 @@ const JOURNAL_PROPERTIES: [&str; 13] = [
 	"CPUUsageNSec",
 	"Environment",
 	"User",
-	"StatusErrno",
+	"ExecMainStatus",
 	"Result",
 ];
 
@@ -75,7 +75,7 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 				s_info.environment_vals = split.iter().filter_map(|kv| kv.split_once("=")).map(|(k, v)| (k.to_string(), v.to_string())).collect();
 			}
 			Some(("User", val)) => s_info.user = val.to_string(),
-			Some(("StatusErrno", val)) => s_info.status_errno = val.parse()?,
+			Some(("ExecMainStatus", val)) => s_info.main_status = val.parse()?,
 			Some(("Result", val)) => s_info.result = val.to_string(),
 			_ => (),
 		}

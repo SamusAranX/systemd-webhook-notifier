@@ -17,7 +17,7 @@ pub fn process_discord_webhook(discord_args: DiscordArgs, service_info: ServiceI
 		let mut fields: Vec<EmbedField> = vec![];
 		fields.push(EmbedField::new("Service File", service_info.fragment_path));
 		fields.push(EmbedField::new_inline("Result", service_info.result));
-		fields.push(EmbedField::new_inline("Exit Code", format!("{}", service_info.status_errno)));
+		fields.push(EmbedField::new_inline("Exit Code", format!("{}", service_info.main_status)));
 		fields.push(EmbedField::new_inline("User", service_info.user));
 		fields.push(EmbedField::new_inline("Triggered By", service_info.triggered_by));
 		fields.push(EmbedField::new_inline("Started", service_info.start_timestamp));
