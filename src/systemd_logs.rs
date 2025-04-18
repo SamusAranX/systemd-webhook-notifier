@@ -58,7 +58,8 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 		.context("failed to run systemctl")?;
 
 	if !output.status.success() {
-		bail!("systemctl exited with a non-zero status code")
+		let code = output.status.code().map_or("N/A".to_string(), |code| format!("{code}"));
+		bail!("systemctl exited with status code {code}")
 	}
 
 	let stdout = match String::from_utf8(output.stdout) {
@@ -106,7 +107,8 @@ pub fn get_invocation_logs<S: Into<String>>(invocation_id: S) -> Result<String> 
 		.context("failed to run journalctl")?;
 
 	if !output.status.success() {
-		bail!("journalctl exited with a non-zero status code")
+		let code = output.status.code().map_or("N/A".to_string(), |code| format!("{code}"));
+		bail!("journalctl exited with status code {code}")
 	}
 
 	match String::from_utf8(output.stdout) {

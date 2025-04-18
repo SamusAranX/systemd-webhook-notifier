@@ -24,7 +24,8 @@ Description=Sends the log for a unit's last invocation to a configurable webhook
 
 [Service]
 Type=simple
-User=root
+DynamicUser=yes
+SupplementaryGroups=systemd-journal
 ExecStart=/usr/local/bin/notifier discord %I
 EnvironmentFile=/usr/local/share/notifier/%I.env
 SyslogIdentifier=notifier
@@ -34,7 +35,7 @@ SyslogFacility=user
 WantedBy=default.target
 ```
 
-**Note:** `notifier` generally does *not* require root privileges, so feel free to change the `User=` line to something more restrictive.
+**Note:** `notifier` generally does *not* require root privileges, but it needs access to the journal.
 
 ### Preparing environment files
 
