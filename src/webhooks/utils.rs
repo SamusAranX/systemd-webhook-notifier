@@ -13,11 +13,11 @@ pub(crate) fn post_multipart_form(form: Form, url: String) -> anyhow::Result<()>
 		Ok(resp) => {
 			let status = resp.status();
 			let resp_text = resp.text().inspect_err(|e| eprintln!("couldn't get webhook text: {e}"))?;
-			println!("send_webhook: {status}");
 			if !status.is_success() {
-				eprintln!("status: {status}, response: {resp_text}");
+				eprintln!("Couldn't send webhook message ({status}), response: {resp_text}");
 				anyhow::bail!(resp_text);
 			}
+			println!("Successfully sent webhook message");
 		}
 		Err(err) => {
 			eprintln!("couldn't send webhook request: {err:?}");

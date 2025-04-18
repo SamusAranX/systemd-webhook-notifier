@@ -10,8 +10,8 @@ pub struct ServiceInfo {
 	pub invocation_id: String,
 	pub start_timestamp: String,
 	pub exit_timestamp: String,
-	pub memory_peak: u64,
-	pub cpu_usage_ns: u64,
+	pub memory_peak: Option<u64>,
+	pub cpu_usage_ns: Option<u64>,
 	pub environment_str: String,
 	pub environment_vals: Vec<(String, String)>,
 	pub user: String,
@@ -35,6 +35,18 @@ const JOURNAL_PROPERTIES: [&str; 13] = [
 	"Result",
 ];
 
+pub fn does_unit_exist<S: Into<String>>(unit_name: S) -> Result<bool> {
+	let unit_name = unit_name.into();
+
+	let output = Command::new("systemctl")
+		.args(["list-unit-files", "-q"])
+		.arg(unit_name)
+		.output()
+		.context("failed to run systemctl")?;
+
+	Ok(output.status.success())
+}
+
 pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo> {
 	let service_name = service_name.into();
 
@@ -43,10 +55,10 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 		.args(JOURNAL_PROPERTIES.iter().flat_map(|prop| vec!["-p", prop]))
 		.arg(service_name)
 		.output()
-		.context("failed to run journalctl")?;
+		.context("failed to run systemctl")?;
 
 	if !output.status.success() {
-		bail!("wh")
+		bail!("systemctl exited with a non-zero status code")
 	}
 
 	let stdout = match String::from_utf8(output.stdout) {
@@ -66,8 +78,8 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 			Some(("InvocationID", val)) => s_info.invocation_id = val.to_string(),
 			Some(("ExecMainStartTimestamp", val)) => s_info.start_timestamp = val.to_string(),
 			Some(("ExecMainExitTimestamp", val)) => s_info.exit_timestamp = val.to_string(),
-			Some(("MemoryPeak", val)) => s_info.memory_peak = val.parse()?,
-			Some(("CPUUsageNSec", val)) => s_info.cpu_usage_ns = val.parse()?,
+			Some(("MemoryPeak", val)) => s_info.memory_peak = val.parse().ok(),
+			Some(("CPUUsageNSec", val)) => s_info.cpu_usage_ns = val.parse().ok(),
 			Some(("Environment", val)) => {
 				s_info.environment_str = val.to_string();
 
@@ -94,7 +106,7 @@ pub fn get_invocation_logs<S: Into<String>>(invocation_id: S) -> Result<String> 
 		.context("failed to run journalctl")?;
 
 	if !output.status.success() {
-		bail!("wh")
+		bail!("journalctl exited with a non-zero status code")
 	}
 
 	match String::from_utf8(output.stdout) {

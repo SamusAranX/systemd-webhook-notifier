@@ -36,6 +36,10 @@ fn main() -> Result<()> {
 		bail!("You must specify a service name.");
 	}
 
+	if !systemd_logs::does_unit_exist(&service_name)? {
+		bail!("The specified unit \"{service_name}\" does not exist.");
+	}
+
 	let service_info = match systemd_logs::get_service_info(&service_name) {
 		Ok(service_info) => service_info,
 		Err(err) => {
