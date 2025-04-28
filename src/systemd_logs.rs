@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use nix::unistd::{Uid, User};
 use std::process::Command;
 
 #[derive(Default, Debug)]
@@ -35,10 +36,34 @@ const JOURNAL_PROPERTIES: [&str; 13] = [
 	"Result",
 ];
 
+/// Returns \["--user"\] only if the executing user is **not** root.
+/// Used when calling `systemctl` or `journalctl`.
+fn user_args() -> Vec<String> {
+	if Uid::current().is_root() {
+		return Vec::new();
+	}
+
+	vec!["--user".to_owned()]
+}
+
+fn get_user_name() -> Result<String> {
+	let user = User::from_uid(Uid::current()).context("Couldn't find user")?;
+	match user {
+		None => bail!("No user found"),
+		Some(user) => Ok(user.name),
+	}
+}
+
 pub fn does_unit_exist<S: Into<String>>(unit_name: S) -> Result<bool> {
-	let unit_name = unit_name.into();
+	let mut unit_name = unit_name.into();
+	if !unit_name.ends_with(".service") {
+		// systemctl list-unit-files needs the .service suffix for some reason
+		// so we add it here if it's missing
+		unit_name += ".service";
+	}
 
 	let output = Command::new("systemctl")
+		.args(user_args())
 		.args(["list-unit-files", "-q"])
 		.arg(unit_name)
 		.output()
@@ -51,6 +76,7 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 	let service_name = service_name.into();
 
 	let output = Command::new("systemctl")
+		.args(user_args())
 		.args(["show", "--no-pager"])
 		.args(JOURNAL_PROPERTIES.iter().flat_map(|prop| vec!["-p", prop]))
 		.arg(service_name)
@@ -94,6 +120,16 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 		}
 	}
 
+	// the User= field doesn't get set for user units so we'll backfill it
+	if s_info.user.is_empty() {
+		if let Ok(user_name) = get_user_name() {
+			eprintln!("get_user_name(): {user_name}");
+			s_info.user = user_name
+		} else {
+			eprintln!("get_user_name(): failure");
+		}
+	}
+
 	Ok(s_info)
 }
 
@@ -101,6 +137,7 @@ pub fn get_invocation_logs<S: Into<String>>(invocation_id: S) -> Result<String> 
 	let invocation_id = invocation_id.into();
 
 	let output = Command::new("journalctl")
+		.args(user_args())
 		.args(["--no-pager", "-o", "cat"])
 		.arg(format!("_SYSTEMD_INVOCATION_ID={invocation_id}"))
 		.output()

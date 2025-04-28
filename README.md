@@ -3,6 +3,8 @@
 This is a small tool that enables systemd unit `OnFailure=` reporting via webhooks.\
 I made this because I couldn't be bothered to set up sendmail.
 
+**Note:** This was created solely to alert me in case services that are triggered by timers fail. This was not tested with sockets or other types of unit files.
+
 ## Setup
 
 ### Building
@@ -26,14 +28,16 @@ Description=Sends the log for a unit's last invocation to a configurable webhook
 Type=simple
 DynamicUser=yes
 SupplementaryGroups=systemd-journal
-ExecStart=/usr/local/bin/notifier discord %I
-EnvironmentFile=/usr/local/share/notifier/%I.env
+ExecStart=/usr/local/bin/notifier discord %i
+EnvironmentFile=/usr/local/share/notifier/%i.env
 SyslogIdentifier=notifier
 SyslogFacility=user
 
 [Install]
 WantedBy=default.target
 ```
+
+If you want to use this for user units, omit the `DynamicUser` and `SupplementaryGroups` lines and store the file in the folder for user units instead. (Commonly `.config/systemd/user/`)
 
 **Note:** `notifier` generally does *not* require root privileges, but it needs access to the journal.
 
@@ -51,11 +55,12 @@ DISCORD_THUMBNAIL=https://example.com/thumbnail.png
 DISCORD_COLOR=0xFF00FF
 ```
 
-The name of the file depends on what you put into the above unit file's `EnvironmentFile=` line. If you want to watch a unit named `example.service`, name this file `example.service.env`.
+The name of the file depends on what you put into the above unit file's `EnvironmentFile=` line. 
+If you want to watch a unit named `example.service`, name this file `example.env`, omitting the `.service` bit.
 
 ### Setting up unit failure alerts
 
-Simply add `OnFailure=notifier@%n.service` to the `[Unit]` block of the unit whose failures you want to be notified about.
+Simply add `OnFailure=notifier@%N.service` to the `[Unit]` block of the unit whose failures you want to be notified about.
 
 If you've specified a webhook in the corresponding .env file, you'll receive an alert kinda like this:
 

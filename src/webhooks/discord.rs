@@ -7,17 +7,32 @@ use humansize::DECIMAL;
 use reqwest::blocking::multipart::{Form, Part};
 use std::time::Duration;
 
+const LAST_N_LOG_LINES: usize = 8;
+
 pub fn process_discord_webhook(discord_args: DiscordArgs, service_info: ServiceInfo, last_log: String) -> Result<()> {
 	let mut webhook = Webhook::default();
 	let mut embed = WebhookEmbed::new(discord_args.thumbnail, discord_args.color);
 
 	embed.title = Some(service_info.name);
 	embed.description = Some(service_info.description);
+
 	embed.fields = {
 		const NOT_AVAILABLE: &str = "N/A";
 
 		let mut fields: Vec<EmbedField> = vec![];
+
+		let mut last_lines: Vec<String> = last_log.lines().rev().take(LAST_N_LOG_LINES).map(String::from).collect();
+		if !last_lines.is_empty() {
+			last_lines.reverse();
+			let last_lines_str = last_lines.join("\n");
+			fields.push(EmbedField::new(
+				"Last Log Output",
+				format!("```\n{last_lines_str}\n```"),
+			));
+		}
+
 		fields.push(EmbedField::new("Service File", service_info.fragment_path));
+
 		fields.push(EmbedField::new_inline("Result", service_info.result));
 		fields.push(EmbedField::new_inline("Exit Code", format!("{}", service_info.main_status)));
 
