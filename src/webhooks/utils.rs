@@ -1,4 +1,6 @@
+use crate::constants::GIT_VERSION;
 use reqwest::blocking::multipart::Form;
+use reqwest::header::USER_AGENT;
 use std::error::Error;
 use std::time::Duration;
 
@@ -7,7 +9,11 @@ pub const NOTIFIER_NAME: &str = "systemd-webhook-notifier";
 
 pub(crate) fn post_multipart_form(form: Form, url: String) -> anyhow::Result<()> {
 	let client = reqwest::blocking::Client::new();
-	let r = client.post(url).timeout(Duration::from_secs(20)).multipart(form);
+	let r = client
+		.post(url)
+		.header(USER_AGENT, format!("{NOTIFIER_NAME}/{GIT_VERSION}"))
+		.timeout(Duration::from_secs(20))
+		.multipart(form);
 
 	match r.send() {
 		Ok(resp) => {

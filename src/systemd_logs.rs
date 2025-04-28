@@ -1,5 +1,7 @@
 use anyhow::{bail, Context, Result};
 use nix::unistd::{Uid, User};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::process::Command;
 
 #[derive(Default, Debug)]
@@ -55,8 +57,11 @@ fn get_user_name() -> Result<String> {
 }
 
 pub fn does_unit_exist<S: Into<String>>(unit_name: S) -> Result<bool> {
+	// suffixes listed here https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#Description
+	static UNIT_SUFFIXES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\.(service|socket|device|mount|automount|swap|target|path|timer|slice|scope)$").unwrap());
+
 	let mut unit_name = unit_name.into();
-	if !unit_name.ends_with(".service") {
+	if !UNIT_SUFFIXES.is_match(&*unit_name) {
 		// systemctl list-unit-files needs the .service suffix for some reason
 		// so we add it here if it's missing
 		unit_name += ".service";
@@ -123,8 +128,8 @@ pub fn get_service_info<S: Into<String>>(service_name: S) -> Result<ServiceInfo>
 	// the User= field doesn't get set for user units so we'll backfill it
 	if s_info.user.is_empty() {
 		if let Ok(user_name) = get_user_name() {
-			eprintln!("get_user_name(): {user_name}");
-			s_info.user = user_name
+			// append an asterisk so it's recognizable as a backfill
+			s_info.user = format!("*{user_name}");
 		} else {
 			eprintln!("get_user_name(): failure");
 		}
