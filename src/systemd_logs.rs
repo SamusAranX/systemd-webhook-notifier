@@ -61,12 +61,10 @@ pub fn does_unit_exist<S: Into<String>>(unit_name: S) -> Result<bool> {
 	static UNIT_SUFFIXES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\.(service|socket|device|mount|automount|swap|target|path|timer|slice|scope)$").unwrap());
 
 	let mut unit_name = unit_name.into();
-	eprintln!("Checking whether unit \"{unit_name}\" exists…");
 	if !UNIT_SUFFIXES.is_match(&unit_name) {
 		// systemctl list-unit-files needs the .service suffix for some reason
 		// so we add it here if it's missing
 		unit_name += ".service";
-		eprintln!("Changed unit name to \"{unit_name}\"");
 	}
 
 	let output = Command::new("systemctl")
@@ -75,8 +73,6 @@ pub fn does_unit_exist<S: Into<String>>(unit_name: S) -> Result<bool> {
 		.arg(unit_name)
 		.output()
 		.context("Failed to run systemctl")?;
-
-	eprintln!("'systemctl list-unit-files -q' exited with status {}", output.status.code().unwrap_or(-1));
 
 	Ok(output.status.success())
 }
