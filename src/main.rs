@@ -1,19 +1,19 @@
 use crate::args::{Args, Commands};
 use crate::webhooks::discord::process_discord_webhook;
-use anyhow::{bail, Result};
 use clap::Parser;
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitCode, Stdio};
 
 mod args;
 mod constants;
 mod systemd_logs;
 mod webhooks;
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
 	// preflight 1: this only runs on linux
-	#[cfg(any(target_os = "windows", target_os = "macos"))]
+	#[cfg(not(target_os="linux"))]
 	{
-		bail!("This utility does not run on macOS or Windows.");
+		eprintln!("This utility does not run on macOS or Windows.");
+		return ExitCode::FAILURE;
 	}
 
 	// preflight 2: make sure systemctl and journalctl are available
@@ -22,7 +22,8 @@ fn main() -> Result<()> {
 		match Command::new(cmd).arg("--version").stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
 			Ok(_) => (),
 			Err(e) => {
-				bail!("[preflight] error running {cmd}: {e}");
+				eprintln!("[preflight] error running {cmd}: {e}");
+				return ExitCode::FAILURE;
 			}
 		}
 	}
@@ -33,29 +34,51 @@ fn main() -> Result<()> {
 
 	// preflight 3: we actually need a service name
 	if service_name.trim().is_empty() {
-		bail!("You must specify a service name.");
+		eprintln!("You must specify a service name.");
+		return ExitCode::FAILURE;
 	}
 
-	if !systemd_logs::does_unit_exist(&service_name)? {
-		bail!("The specified unit \"{service_name}\" does not exist.");
+	match systemd_logs::does_unit_exist(&service_name) {
+		Ok(exists) => {
+			if !exists {
+				eprintln!("The specified unit \"{service_name}\" does not exist.");
+				return ExitCode::FAILURE;
+			}
+		}
+		Err(err) => {
+			eprintln!("Couldn't check whether unit exists:");
+			eprintln!("{err}");
+			return ExitCode::FAILURE;
+		}
 	}
 
 	let service_info = match systemd_logs::get_service_info(&service_name) {
 		Ok(service_info) => service_info,
 		Err(err) => {
-			bail!("Couldn't get service info: {err:?}");
+			eprintln!("Couldn't get service info: {err:?}");
+			return ExitCode::FAILURE;
 		}
 	};
 
 	let last_log = match systemd_logs::get_invocation_logs(&service_info.invocation_id) {
 		Ok(logs) => logs,
 		Err(err) => {
-			bail!("Couldn't get last invocation logs: {err:?}");
+			eprintln!("Couldn't get last invocation logs: {err:?}");
+			return ExitCode::FAILURE;
 		}
 	};
 
 	match args.command {
-		Commands::Discord(discord_args) => process_discord_webhook(discord_args, service_info, last_log)?,
+		Commands::Discord(discord_args) => {
+			match process_discord_webhook(discord_args, service_info, last_log) {
+				Ok(_) => (),
+				Err(err) => {
+					eprintln!("Error invoking Discord webhook:");
+					eprintln!("{err}");
+					return ExitCode::FAILURE;
+				}
+			}
+		},
 		Commands::Print(print_args) => {
 			if print_args.verbose {
 				println!("service info: {:?}", &service_info);
@@ -65,5 +88,5 @@ fn main() -> Result<()> {
 		}
 	}
 
-	Ok(())
+	ExitCode::SUCCESS
 }
